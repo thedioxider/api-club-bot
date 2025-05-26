@@ -2,7 +2,7 @@ use teloxide::{
     dispatching::UpdateHandler,
     filter_command,
     prelude::*,
-    types::ParseMode,
+    types::{MessageKind, ParseMode},
     utils::{command::BotCommands, html as tgfmt},
 };
 
@@ -25,15 +25,25 @@ async fn main() -> Result<(), Error> {
 }
 
 fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>> {
-    use dptree::case;
+    use dptree::{case, entry};
 
     let command_handler = Update::filter_message().chain(
         filter_command::<Command, _>()
             .branch(case![Command::Start].endpoint(help_command))
             .branch(case![Command::Help].endpoint(help_command)),
     );
+    let member_update_msg_handler = entry()
+        .filter(|msg: Message| match msg.kind {
+            MessageKind::NewChatMembers(_) | MessageKind::LeftChatMember(_) => true,
+            _ => false,
+        })
+        .endpoint(member_update_msg_endpoint);
 
-    dptree::entry().branch(command_handler)
+    entry().branch(
+        Update::filter_message()
+            .branch(command_handler)
+            .branch(member_update_msg_handler),
+    )
 }
 
 #[derive(BotCommands, Clone)]
@@ -58,5 +68,10 @@ async fn help_command(bot: Bot, msg: Message) -> Result<(), Error> {
             ),
         )
         .await?;
+    Ok(())
+}
+
+async fn member_update_msg_endpoint(bot: Bot, msg: Message) -> Result<(), Error> {
+    bot.delete_message(msg.chat.id, msg.id).await?;
     Ok(())
 }
