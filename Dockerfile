@@ -8,5 +8,8 @@ COPY . .
 # install app-specific dependencies
 RUN cargo install --path .
 
+# provide bot token to teloxide
+ARG BOT_TOKEN
+ENV TELOXIDE_TOKEN=$BOT_TOKEN
 # app command
 CMD ["api-club-bot"]

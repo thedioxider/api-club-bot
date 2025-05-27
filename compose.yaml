@@ -4,9 +4,10 @@ services:
       context: .
       secrets:
         - bot_token
+      args:
+        BOT_TOKEN: "$BOT_TOKEN"
     environment:
       RUST_LOG: "info"
-      TELOXIDE_TOKEN: "$BOT_TOKEN"
 
 secrets:
   bot_token:
