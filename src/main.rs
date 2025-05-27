@@ -22,6 +22,17 @@ async fn main() -> Result<(), Error> {
 
     Dispatcher::builder(bot, schema())
         .enable_ctrlc_handler()
+        .distribution_function(|upd: &Update| {
+            if let Some(chat) = upd.chat() {
+                if chat.is_supergroup() {
+                    None
+                } else {
+                    Some(chat.id)
+                }
+            } else {
+                None
+            }
+        })
         .build()
         .dispatch()
         .await;
@@ -29,7 +40,7 @@ async fn main() -> Result<(), Error> {
 }
 
 fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>> {
-    use dptree::{case, entry};
+    use dptree::case;
 
     // filters command messages and excutes them
     let command_handler = Update::filter_message().chain(
@@ -38,20 +49,20 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
             .branch(case![Command::Help].endpoint(help_command)),
     );
     // filter member join/leave messages and delete them
-    let member_update_msg_handler = entry()
-        .filter(|msg: Message| match msg.kind {
-            MessageKind::NewChatMembers(_) | MessageKind::LeftChatMember(_) => true,
-            _ => false,
-        })
-        .endpoint(member_update_msg_endpoint);
+    let member_update_msg_handler = dptree::filter(|msg: Message| match msg.kind {
+        MessageKind::NewChatMembers(_) | MessageKind::LeftChatMember(_) => true,
+        _ => false,
+    })
+    .endpoint(member_update_msg_endpoint);
     // greets newcomers
-    let new_member_handler = entry()
-        .filter(|cmu: ChatMemberUpdated| {
-            cmu.old_chat_member.is_left() && cmu.new_chat_member.is_present()
-        })
-        .endpoint(new_member_endpoint);
+    let new_member_handler = dptree::filter(|cmu: ChatMemberUpdated| {
+        cmu.chat.is_supergroup()
+            && cmu.old_chat_member.is_left()
+            && cmu.new_chat_member.is_present()
+    })
+    .endpoint(new_member_endpoint);
 
-    entry()
+    dptree::entry()
         .branch(
             Update::filter_message()
                 .branch(command_handler)
