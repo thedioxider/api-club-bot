@@ -1,9 +1,13 @@
 services:
   bot:
-    env_file:
-      # provide bot token and other secrets
-      - path: /etc/secrets/api-club-bot.env
-        required: true
+    build:
+      context: .
+      secrets:
+        - bot_token
     environment:
       RUST_LOG: "info"
-    build: .
+      TELOXIDE_TOKEN: "$BOT_TOKEN"
+
+secrets:
+  bot_token:
+    environment: BOT_TOKEN
