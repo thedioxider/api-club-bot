@@ -4,7 +4,7 @@ use teloxide::{
     dispatching::UpdateHandler,
     filter_command,
     prelude::*,
-    types::{MessageKind, ParseMode},
+    types::{BotCommandScope, MessageKind, ParseMode},
     utils::{command::BotCommands, html as tgfmt},
 };
 use tokio::time::sleep;
@@ -17,7 +17,9 @@ async fn main() -> Result<(), Error> {
 
     let bot = Bot::from_env();
     // make bot available commands appear in helper menu
-    bot.set_my_commands(Command::bot_commands()).await?;
+    bot.set_my_commands(PrivateCommand::bot_commands())
+        .scope(BotCommandScope::AllPrivateChats)
+        .await?;
     log::info!("Starting the bot...");
 
     Dispatcher::builder(bot, schema())
@@ -43,11 +45,13 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
     use dptree::case;
 
     // filters command messages and excutes them
-    let command_handler = Update::filter_message().chain(
-        filter_command::<Command, _>()
-            .branch(case![Command::Start].endpoint(help_command))
-            .branch(case![Command::Help].endpoint(help_command)),
-    );
+    let private_command_handler = Update::filter_message()
+        .filter(|msg: Message| msg.chat.is_private())
+        .chain(
+            filter_command::<PrivateCommand, _>()
+                .branch(case![PrivateCommand::Start].endpoint(help_command))
+                .branch(case![PrivateCommand::Help].endpoint(help_command)),
+        );
     // filter member join/leave messages and delete them
     let member_update_msg_handler = dptree::filter(|msg: Message| match msg.kind {
         MessageKind::NewChatMembers(_) | MessageKind::LeftChatMember(_) => true,
@@ -65,7 +69,7 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
     dptree::entry()
         .branch(
             Update::filter_message()
-                .branch(command_handler)
+                .branch(private_command_handler)
                 .branch(member_update_msg_handler),
         )
         .branch(Update::filter_chat_member().branch(new_member_handler))
@@ -73,7 +77,7 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "snake_case")]
-enum Command {
+enum PrivateCommand {
     #[command(hide)]
     Start,
     /// Show useful info
