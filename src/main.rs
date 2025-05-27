@@ -15,6 +15,7 @@ pub type Error = Box<dyn std::error::Error + Send + Sync>;
 async fn main() -> Result<(), Error> {
     pretty_env_logger::init();
 
+    // TELOXIDE_TOKEN env variable is required
     let bot = Bot::from_env();
     // make bot available commands appear in helper menu
     bot.set_my_commands(PrivateCommand::bot_commands())

@@ -1,0 +1,9 @@
+services:
+  bot:
+    env_file:
+      # provide bot token and other secrets
+      - path: /etc/secrets/api-club-bot.env
+        required: true
+    environment:
+      RUST_LOG: "info"
+    build: .
