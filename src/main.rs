@@ -4,7 +4,7 @@ use teloxide::{
     dispatching::UpdateHandler,
     filter_command,
     prelude::*,
-    types::{BotCommandScope, MessageKind, ParseMode},
+    types::{BotCommandScope, MediaKind, MessageKind, ParseMode},
     utils::{command::BotCommands, html as tgfmt},
 };
 use tokio::time::sleep;
@@ -36,6 +36,9 @@ async fn main() -> Result<(), Error> {
                 None
             }
         })
+        .default_handler(|upd| async move {
+            log::debug!("Unhandled update: {:?}", upd);
+        })
         .build()
         .dispatch()
         .await;
@@ -45,6 +48,9 @@ async fn main() -> Result<(), Error> {
 fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>> {
     use dptree::case;
 
+    // log messages that are sent directly to bot
+    let private_message_handler =
+        dptree::filter(|msg: Message| msg.chat.is_private()).endpoint(log_message);
     // filters command messages and excutes them
     let private_command_handler = Update::filter_message()
         .filter(|msg: Message| msg.chat.is_private())
@@ -70,6 +76,7 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
     dptree::entry()
         .branch(
             Update::filter_message()
+                .branch(private_message_handler)
                 .branch(private_command_handler)
                 .branch(member_update_msg_handler),
         )
@@ -84,6 +91,39 @@ enum PrivateCommand {
     /// Show useful info
     #[command(aliases = ["h", "?"], hide_aliases)]
     Help,
+}
+
+async fn log_message(msg: Message) -> Result<(), Error> {
+    let media = if let MessageKind::Common(mcommon) = msg.kind {
+        mcommon.media_kind
+    } else {
+        return Ok(());
+    };
+    let with_header = |header: &str, content: &str| format!("~~> {}:\n{}", header, content);
+    let contents = match media {
+        MediaKind::Text(m_text) => with_header("Text", &m_text.text),
+        _ => String::new(),
+    };
+    if contents.is_empty() {
+        return Ok(());
+    }
+    log::info!(
+        "Message from {}:\n{}",
+        if let Some(user) = msg.from {
+            format!(
+                "user {}",
+                if let Some(uname) = user.username {
+                    format!("@{}", uname)
+                } else {
+                    format!("id#{}", user.id)
+                }
+            )
+        } else {
+            String::from("undefined")
+        },
+        contents
+    );
+    Ok(())
 }
 
 async fn help_command(bot: Bot, msg: Message) -> Result<(), Error> {
