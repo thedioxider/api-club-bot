@@ -94,7 +94,18 @@ async fn log_message(msg: Message) -> Result<(), Error> {
     } else {
         return Ok(());
     };
-    let with_header = |header: &str, content: &str| format!("~~> {}:\n{}", header, content);
+    let with_header = |header: &str, content: &str| {
+        format!(
+            "~~> {}:{}{}",
+            header,
+            if content.lines().count() <= 1 {
+                " "
+            } else {
+                "\n"
+            },
+            content
+        )
+    };
     let contents = match media {
         MediaKind::Text(m_text) => with_header("Text", &m_text.text),
         _ => String::new(),
