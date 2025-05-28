@@ -52,13 +52,11 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
     let private_message_handler =
         dptree::filter(|msg: Message| msg.chat.is_private()).endpoint(log_message);
     // filters command messages and excutes them
-    let private_command_handler = Update::filter_message()
-        .filter(|msg: Message| msg.chat.is_private())
-        .chain(
-            filter_command::<PrivateCommand, _>()
-                .branch(case![PrivateCommand::Start].endpoint(help_command))
-                .branch(case![PrivateCommand::Help].endpoint(help_command)),
-        );
+    let private_command_handler = dptree::filter(|msg: Message| msg.chat.is_private()).chain(
+        filter_command::<PrivateCommand, _>()
+            .branch(case![PrivateCommand::Start].endpoint(help_command))
+            .branch(case![PrivateCommand::Help].endpoint(help_command)),
+    );
     // filter member join/leave messages and delete them
     let member_update_msg_handler = dptree::filter(|msg: Message| match msg.kind {
         MessageKind::NewChatMembers(_) | MessageKind::LeftChatMember(_) => true,
