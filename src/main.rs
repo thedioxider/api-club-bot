@@ -48,15 +48,9 @@ async fn main() -> Result<(), Error> {
 fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>> {
     use dptree::case;
 
-    // log messages that are sent directly to bot
-    let private_message_handler =
-        dptree::filter(|msg: Message| msg.chat.is_private()).endpoint(log_message);
-    // filters command messages and excutes them
-    let private_command_handler = dptree::filter(|msg: Message| msg.chat.is_private()).chain(
-        filter_command::<PrivateCommand, _>()
-            .branch(case![PrivateCommand::Start].endpoint(help_command))
-            .branch(case![PrivateCommand::Help].endpoint(help_command)),
-    );
+    let private_command_handler = filter_command::<PrivateCommand, _>()
+        .branch(case![PrivateCommand::Start].endpoint(help_command))
+        .branch(case![PrivateCommand::Help].endpoint(help_command));
     // filter member join/leave messages and delete them
     let member_update_msg_handler = dptree::filter(|msg: Message| match msg.kind {
         MessageKind::NewChatMembers(_) | MessageKind::LeftChatMember(_) => true,
@@ -74,9 +68,12 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
     dptree::entry()
         .branch(
             Update::filter_message()
-                .branch(private_message_handler)
+                .branch(member_update_msg_handler)
+                // filter only messages that are sent directly to bot
+                .chain(dptree::filter(|msg: Message| msg.chat.is_private()))
                 .branch(private_command_handler)
-                .branch(member_update_msg_handler),
+                // log unhandled messages that are sent directly to bot
+                .endpoint(log_message),
         )
         .branch(Update::filter_chat_member().branch(new_member_handler))
 }
