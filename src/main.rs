@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate version;
 use std::time::Duration;
 
 use teloxide::{
@@ -47,10 +49,16 @@ async fn main() -> Result<(), Error> {
 
 fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>> {
     use dptree::case;
+    let version_command = |bot: Bot, msg: Message| async move {
+        bot.send_message(msg.chat.id, format!("Bot version: v{}", version!()))
+            .await?;
+        Ok(())
+    };
 
     let private_command_handler = filter_command::<PrivateCommand, _>()
         .branch(case![PrivateCommand::Start].endpoint(help_command))
-        .branch(case![PrivateCommand::Help].endpoint(help_command));
+        .branch(case![PrivateCommand::Help].endpoint(help_command))
+        .branch(case![PrivateCommand::Version].endpoint(version_command));
     // filter member join/leave messages and delete them
     let member_update_msg_handler = dptree::filter(|msg: Message| match msg.kind {
         MessageKind::NewChatMembers(_) | MessageKind::LeftChatMember(_) => true,
@@ -86,6 +94,8 @@ enum PrivateCommand {
     /// Show useful info
     #[command(aliases = ["h", "?"], hide_aliases)]
     Help,
+    #[command(alias = "ver", hide)]
+    Version,
 }
 
 async fn log_message(msg: Message) -> Result<(), Error> {
