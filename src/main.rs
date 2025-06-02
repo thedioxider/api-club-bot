@@ -165,6 +165,7 @@ async fn new_member_endpoint(bot: Bot, cmu: ChatMemberUpdated) -> Result<(), Err
                 tgfmt::bold(tgfmt::user_mention(user.id, user.first_name.as_str()).as_str()),
             ),
         )
+        .disable_notification(true)
         .await?;
     // wait for 15 minutes and then clear the greeing message
     sleep(Duration::from_secs(15 * 60)).await;
