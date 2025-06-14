@@ -15,6 +15,16 @@ fn sanitize_input(input: &str) -> String {
     format!("\"{}\"", sanitized)
 }
 
+fn sender_uid(msg: &Message) -> String {
+    match &msg.from {
+        Some(user) => user
+            .username
+            .clone()
+            .unwrap_or_else(|| user.id.0.to_string()),
+        None => String::new(),
+    }
+}
+
 pub async fn request_command(bot: Bot, msg: Message, dialogue: _Dialogue) -> Result<(), Error> {
     let state = dialogue.get_or_default().await?;
     match state {
@@ -70,10 +80,7 @@ pub async fn request_command(bot: Bot, msg: Message, dialogue: _Dialogue) -> Res
                 .open(Path::new(&*BOT_DATA_PATH).join(DATABASE_FILE))?;
             let new_row: String = [
                 Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
-                match msg.from {
-                    Some(user) => user.username.unwrap_or_else(|| user.id.0.to_string()),
-                    None => String::new(),
-                },
+                sender_uid(&msg),
                 artist,
                 song,
                 link,
