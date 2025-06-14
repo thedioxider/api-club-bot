@@ -2,13 +2,10 @@ services:
   bot:
     build:
       context: .
-      secrets:
-        - bot_token
       args:
         BOT_TOKEN: "$BOT_TOKEN"
     environment:
       RUST_LOG: "info"
-
-secrets:
-  bot_token:
-    environment: BOT_TOKEN
+      BOT_DATA_PATH: "/usr/data"
+    volumes:
+      - ./data:/usr/data

@@ -1,21 +1,44 @@
+pub mod request;
+use request::request_command;
+
 #[macro_use]
 extern crate version;
-use std::time::Duration;
+use std::{env, sync::LazyLock, time::Duration};
 
 use teloxide::{
-    dispatching::UpdateHandler,
+    dispatching::{UpdateHandler, dialogue::InMemStorage},
     filter_command,
-    prelude::*,
+    prelude::{Dialogue, *},
     types::{BotCommandScope, MediaKind, MessageKind, ParseMode},
     utils::{command::BotCommands, html as tgfmt},
 };
 use tokio::time::sleep;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type _Dialogue = Dialogue<State, InMemStorage<State>>;
+
+#[derive(Clone, Default)]
+pub enum State {
+    #[default]
+    Start,
+    RequestArtist,
+    RequestSong {
+        artist: String,
+    },
+    RequestLink {
+        artist: String,
+        song: String,
+    },
+}
+
+// BOT_DATA_PATH environment variable should be defined to store database there
+static BOT_DATA_PATH: LazyLock<String> =
+    LazyLock::new(|| env::var("BOT_DATA_PATH").expect("data path was not provided"));
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     pretty_env_logger::init();
+    log::info!("Data path: {}", &*BOT_DATA_PATH);
 
     // TELOXIDE_TOKEN env variable is required
     let bot = Bot::from_env();
@@ -41,6 +64,7 @@ async fn main() -> Result<(), Error> {
         .default_handler(|upd| async move {
             log::debug!("Unhandled update: {:?}", upd);
         })
+        .dependencies(dptree::deps![InMemStorage::<State>::new()])
         .build()
         .dispatch()
         .await;
@@ -58,7 +82,8 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
     let private_command_handler = filter_command::<PrivateCommand, _>()
         .branch(case![PrivateCommand::Start].endpoint(help_command))
         .branch(case![PrivateCommand::Help].endpoint(help_command))
-        .branch(case![PrivateCommand::Version].endpoint(version_command));
+        .branch(case![PrivateCommand::Version].endpoint(version_command))
+        .branch(case![PrivateCommand::Request].endpoint(request_command));
     // filter member join/leave messages and delete them
     let member_update_msg_handler = dptree::filter(|msg: Message| match msg.kind {
         MessageKind::NewChatMembers(_) | MessageKind::LeftChatMember(_) => true,
@@ -79,9 +104,22 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
                 .branch(member_update_msg_handler)
                 // filter only messages that are sent directly to bot
                 .chain(dptree::filter(|msg: Message| msg.chat.is_private()))
-                .branch(private_command_handler)
-                // log unhandled messages that are sent directly to bot
-                .endpoint(log_message),
+                .enter_dialogue::<Message, InMemStorage<State>, State>()
+                .branch(
+                    case![State::Start]
+                        .branch(private_command_handler)
+                        // log unhandled messages that are sent directly to bot
+                        .endpoint(log_message),
+                )
+                .branch(filter_command::<PrivateCommand, _>().endpoint(
+                    |bot: Bot, msg: Message, dialogue: _Dialogue| async move {
+                        dialogue.update(State::Start).await?;
+                        bot.send_message(msg.chat.id, "❌ ~ Request interrupted")
+                            .await?;
+                        Ok(())
+                    },
+                ))
+                .endpoint(request_command),
         )
         .branch(Update::filter_chat_member().branch(new_member_handler))
 }
@@ -91,11 +129,16 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
 enum PrivateCommand {
     #[command(hide)]
     Start,
+    /// Request a song to play on the event
+    #[command()]
+    Request,
     /// Show useful info
     #[command(aliases = ["h", "?"], hide_aliases)]
     Help,
     #[command(alias = "ver", hide)]
     Version,
+    #[command(hide)]
+    Cancel,
 }
 
 async fn log_message(msg: Message) -> Result<(), Error> {
@@ -147,7 +190,8 @@ async fn help_command(bot: Bot, msg: Message) -> Result<(), Error> {
         .send_message(
             msg.chat.id,
             format!(
-                "Check out the {}!",
+                "{}\n\nAlso check out the {}!",
+                PrivateCommand::descriptions(),
                 tgfmt::bold(
                     tgfmt::link("https://github.com/thedioxider/api-club-bot", "[repo]").as_str()
                 ),
