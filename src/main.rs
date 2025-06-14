@@ -121,14 +121,14 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
 enum PrivateCommand {
     #[command(hide)]
     Start,
+    /// Request a song to play on the event
+    #[command()]
+    Request,
     /// Show useful info
     #[command(aliases = ["h", "?"], hide_aliases)]
     Help,
     #[command(alias = "ver", hide)]
     Version,
-    /// Request a song to play on the event
-    #[command()]
-    Request,
 }
 
 async fn log_message(msg: Message) -> Result<(), Error> {
@@ -180,7 +180,8 @@ async fn help_command(bot: Bot, msg: Message) -> Result<(), Error> {
         .send_message(
             msg.chat.id,
             format!(
-                "Check out the {}!",
+                "{}\n\nAlso check out the {}!",
+                PrivateCommand::descriptions(),
                 tgfmt::bold(
                     tgfmt::link("https://github.com/thedioxider/api-club-bot", "[repo]").as_str()
                 ),
