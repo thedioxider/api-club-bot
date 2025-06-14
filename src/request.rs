@@ -58,10 +58,6 @@ pub async fn request_command(bot: Bot, msg: Message, dialogue: _Dialogue) -> Res
         }
         State::RequestArtist => match msg.text() {
             Some(text) => {
-                if text == "/cancel" {
-                    dialogue.update(State::Start).await?;
-                    return Ok(());
-                }
                 dialogue
                     .update(State::RequestSong {
                         artist: sanitize_input(text),
@@ -77,10 +73,6 @@ pub async fn request_command(bot: Bot, msg: Message, dialogue: _Dialogue) -> Res
         },
         State::RequestSong { artist } => match msg.text() {
             Some(text) => {
-                if text == "/cancel" {
-                    dialogue.update(State::Start).await?;
-                    return Ok(());
-                }
                 dialogue
                     .update(State::RequestLink {
                         artist: artist,

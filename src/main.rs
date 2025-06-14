@@ -111,6 +111,14 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
                         // log unhandled messages that are sent directly to bot
                         .endpoint(log_message),
                 )
+                .branch(filter_command::<PrivateCommand, _>().endpoint(
+                    |bot: Bot, msg: Message, dialogue: _Dialogue| async move {
+                        dialogue.update(State::Start).await?;
+                        bot.send_message(msg.chat.id, "❌ ~ Request interrupted")
+                            .await?;
+                        Ok(())
+                    },
+                ))
                 .endpoint(request_command),
         )
         .branch(Update::filter_chat_member().branch(new_member_handler))
@@ -129,6 +137,8 @@ enum PrivateCommand {
     Help,
     #[command(alias = "ver", hide)]
     Version,
+    #[command(hide)]
+    Cancel,
 }
 
 async fn log_message(msg: Message) -> Result<(), Error> {
