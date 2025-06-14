@@ -43,7 +43,7 @@ dependencies = [
 
 [[package]]
 name = "api-club-bot"
-version = "0.1.5"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "csv",
