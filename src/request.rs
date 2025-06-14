@@ -3,11 +3,12 @@ use crate::{_Dialogue, BOT_DATA_PATH, Error, State};
 use chrono::prelude::*;
 use regex::Regex;
 use std::fs::OpenOptions;
+use std::fs::create_dir_all;
 use std::io::prelude::*;
 use std::path::Path;
 use teloxide::prelude::*;
-use tokio::fs::create_dir_all;
 
+const DATABASE_FILE: &str = "api_requests.csv";
 fn sanitize_input(input: &str) -> String {
     let re = Regex::new(r"\s+").expect("your regex is ass. session terminated");
     let sanitized = re.replace_all(input.trim(), " ").into_owned();
@@ -62,11 +63,11 @@ pub async fn request_command(bot: Bot, msg: Message, dialogue: _Dialogue) -> Res
                 "/done" | "" => String::new(),
                 _ => sanitize_input(text),
             };
-            create_dir_all(&*BOT_DATA_PATH).await?;
+            create_dir_all(&*BOT_DATA_PATH)?;
             let mut file = OpenOptions::new()
                 .append(true)
                 .create(true)
-                .open(Path::new(&*BOT_DATA_PATH).join("api_requests.csv"))?;
+                .open(Path::new(&*BOT_DATA_PATH).join(DATABASE_FILE))?;
             let new_row: String = [
                 Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
                 match msg.from {
