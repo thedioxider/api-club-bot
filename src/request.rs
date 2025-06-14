@@ -4,7 +4,7 @@ use chrono::prelude::*;
 use regex::Regex;
 use std::fs::OpenOptions;
 use std::fs::create_dir_all;
-use std::io::prelude::*;
+use std::io;
 use std::path::Path;
 use teloxide::prelude::*;
 
@@ -12,8 +12,9 @@ const DATABASE_FILE: &str = "api_requests.csv";
 
 fn sanitize_input(input: &str) -> String {
     let re = Regex::new(r"\s+").expect("your regex is ass. session terminated");
-    let sanitized = re.replace_all(input.trim(), " ").into_owned();
-    format!("\"{}\"", sanitized)
+    let mut sanitized = re.replace_all(input.trim(), " ").into_owned();
+    sanitized.truncate(70);
+    sanitized
 }
 
 fn sender_uid(msg: &Message) -> String {
@@ -97,19 +98,23 @@ pub async fn request_command(bot: Bot, msg: Message, dialogue: _Dialogue) -> Res
                 _ => sanitize_input(text),
             };
             create_dir_all(&*BOT_DATA_PATH)?;
-            let mut file = OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(Path::new(&*BOT_DATA_PATH).join(DATABASE_FILE))?;
-            let new_row: String = [
+            let file_writer = io::BufWriter::new(
+                OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(Path::new(&*BOT_DATA_PATH).join(DATABASE_FILE))?,
+            );
+            let mut wrt = csv::WriterBuilder::new()
+                .has_headers(false)
+                .from_writer(file_writer);
+            let record = [
                 Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
                 sender_uid(&msg),
                 artist,
                 song,
                 link,
-            ]
-            .join(",");
-            writeln!(file, "{}", new_row)?;
+            ];
+            wrt.write_record(record)?;
             dialogue.update(State::Start).await?;
             bot.send_message(
                 msg.chat.id,
