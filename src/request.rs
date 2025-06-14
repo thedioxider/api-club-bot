@@ -4,6 +4,7 @@ use chrono::prelude::*;
 use regex::Regex;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use std::path::Path;
 use teloxide::prelude::*;
 use tokio::fs::create_dir_all;
 
@@ -65,7 +66,7 @@ pub async fn request_command(bot: Bot, msg: Message, dialogue: _Dialogue) -> Res
             let mut file = OpenOptions::new()
                 .append(true)
                 .create(true)
-                .open("./data/api_requests.csv")?;
+                .open(Path::new(&*BOT_DATA_PATH).join("api_requests.csv"))?;
             let new_row: String = [
                 Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
                 match msg.from {

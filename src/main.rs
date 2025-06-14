@@ -38,6 +38,7 @@ static BOT_DATA_PATH: LazyLock<String> =
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     pretty_env_logger::init();
+    log::info!("Data path: {}", &*BOT_DATA_PATH);
 
     // TELOXIDE_TOKEN env variable is required
     let bot = Bot::from_env();
